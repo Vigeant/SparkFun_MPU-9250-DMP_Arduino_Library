@@ -78,8 +78,10 @@ public:
 	unsigned long time;
 	float pitch, roll, yaw;
 	float heading;
+	unsigned char i2cAddr = 0x68;
 	
 	MPU9250_DMP();
+	MPU9250_DMP(const unsigned char addr);
 	
 	// begin(void) -- Verifies communication with the MPU-9250 and the AK8963,
 	// and initializes them to the default state:

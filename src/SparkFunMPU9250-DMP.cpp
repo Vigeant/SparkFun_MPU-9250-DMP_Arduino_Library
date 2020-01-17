@@ -31,6 +31,14 @@ static void tap_cb(unsigned char direction, unsigned char count);
 
 MPU9250_DMP::MPU9250_DMP()
 {
+	i2cAddr = 0x68;
+	_mSense = 6.665f; // Constant - 4915 / 32760
+	_aSense = 0.0f;   // Updated after accel FSR is set
+	_gSense = 0.0f;   // Updated after gyro FSR is set
+}
+
+MPU9250_DMP::MPU9250_DMP(const unsigned char addr){
+	i2cAddr = addr;
 	_mSense = 6.665f; // Constant - 4915 / 32760
 	_aSense = 0.0f;   // Updated after accel FSR is set
 	_gSense = 0.0f;   // Updated after gyro FSR is set
@@ -43,12 +51,12 @@ inv_error_t MPU9250_DMP::begin(void)
 	
 	Wire.begin();
 	
-	result = mpu_init(&int_param);
+	result = mpu_init(i2cAddr, &int_param);
 	
 	if (result)
 		return result;
 	
-	mpu_set_bypass(1); // Place all slaves (including compass) on primary bus
+	mpu_set_bypass(i2cAddr, 1); // Place all slaves (including compass) on primary bus
 	
 	setSensors(INV_XYZ_GYRO | INV_XYZ_ACCEL | INV_XYZ_COMPASS);
 	
@@ -60,7 +68,7 @@ inv_error_t MPU9250_DMP::begin(void)
 
 inv_error_t MPU9250_DMP::enableInterrupt(unsigned char enable)
 {
-	return set_int_enable(enable);
+	return set_int_enable(i2cAddr, enable);
 }
 
 inv_error_t MPU9250_DMP::setIntLevel(unsigned char active_low)
@@ -70,13 +78,13 @@ inv_error_t MPU9250_DMP::setIntLevel(unsigned char active_low)
 
 inv_error_t MPU9250_DMP::setIntLatched(unsigned char enable)
 {
-	return mpu_set_int_latched(enable);
+	return mpu_set_int_latched(i2cAddr, enable);
 }
 
 short MPU9250_DMP::getIntStatus(void)
 {
 	short status;
-	if (mpu_get_int_status(&status) == INV_SUCCESS)
+	if (mpu_get_int_status(i2cAddr, &status) == INV_SUCCESS)
 	{
 		return status;
 	}
@@ -89,13 +97,13 @@ short MPU9250_DMP::getIntStatus(void)
 // Disables compass and gyro
 inv_error_t MPU9250_DMP::lowPowerAccel(unsigned short rate)
 {
-	return mpu_lp_accel_mode(rate);
+	return mpu_lp_accel_mode(i2cAddr, rate);
 }
 
 inv_error_t MPU9250_DMP::setGyroFSR(unsigned short fsr)
 {
 	inv_error_t err;
-	err = mpu_set_gyro_fsr(fsr);
+	err = mpu_set_gyro_fsr(i2cAddr, fsr);
 	if (err == INV_SUCCESS)
 	{
 		_gSense = getGyroSens();
@@ -106,7 +114,7 @@ inv_error_t MPU9250_DMP::setGyroFSR(unsigned short fsr)
 inv_error_t MPU9250_DMP::setAccelFSR(unsigned char fsr)
 {
 	inv_error_t err;
-	err = mpu_set_accel_fsr(fsr);
+	err = mpu_set_accel_fsr(i2cAddr, fsr);
 	if (err == INV_SUCCESS)
 	{
 		_aSense = getAccelSens();
@@ -146,7 +154,7 @@ unsigned short MPU9250_DMP::getMagFSR(void)
 
 inv_error_t MPU9250_DMP::setLPF(unsigned short lpf)
 {
-	return mpu_set_lpf(lpf);
+	return mpu_set_lpf(i2cAddr, lpf);
 }
 
 unsigned short MPU9250_DMP::getLPF(void)
@@ -161,7 +169,7 @@ unsigned short MPU9250_DMP::getLPF(void)
 
 inv_error_t MPU9250_DMP::setSampleRate(unsigned short rate)
 {
-    return mpu_set_sample_rate(rate);
+    return mpu_set_sample_rate(i2cAddr, rate);
 }
 
 unsigned short MPU9250_DMP::getSampleRate(void)
@@ -176,7 +184,7 @@ unsigned short MPU9250_DMP::getSampleRate(void)
 
 inv_error_t MPU9250_DMP::setCompassSampleRate(unsigned short rate)
 {
-	return mpu_set_compass_sample_rate(rate);
+	return mpu_set_compass_sample_rate(i2cAddr, rate);
 }
 
 unsigned short MPU9250_DMP::getCompassSampleRate(void)
@@ -227,21 +235,21 @@ unsigned char MPU9250_DMP::getFifoConfig(void)
 
 inv_error_t MPU9250_DMP::configureFifo(unsigned char sensors)
 {
-	return mpu_configure_fifo(sensors);
+	return mpu_configure_fifo(i2cAddr, sensors);
 }
 
 inv_error_t MPU9250_DMP::resetFifo(void)
 {
-	return mpu_reset_fifo();
+	return mpu_reset_fifo(i2cAddr);
 }
 
 unsigned short MPU9250_DMP::fifoAvailable(void)
 {
 	unsigned char fifoH, fifoL;
 	
-	if (mpu_read_reg(MPU9250_FIFO_COUNTH, &fifoH) != INV_SUCCESS)
+	if (mpu_read_reg(i2cAddr, MPU9250_FIFO_COUNTH, &fifoH) != INV_SUCCESS)
 		return 0;
-	if (mpu_read_reg(MPU9250_FIFO_COUNTL, &fifoL) != INV_SUCCESS)
+	if (mpu_read_reg(i2cAddr, MPU9250_FIFO_COUNTL, &fifoL) != INV_SUCCESS)
 		return 0;
 	
 	return (fifoH << 8 ) | fifoL;
@@ -253,7 +261,7 @@ inv_error_t MPU9250_DMP::updateFifo(void)
 	unsigned long timestamp;
 	unsigned char sensors, more;
 	
-	if (mpu_read_fifo(gyro, accel, &timestamp, &sensors, &more) != INV_SUCCESS)
+	if (mpu_read_fifo(i2cAddr, gyro, accel, &timestamp, &sensors, &more) != INV_SUCCESS)
 		return INV_ERROR;
 	
 	if (sensors & INV_XYZ_ACCEL)
@@ -276,14 +284,14 @@ inv_error_t MPU9250_DMP::updateFifo(void)
 
 inv_error_t MPU9250_DMP::setSensors(unsigned char sensors)
 {
-	return mpu_set_sensors(sensors);
+	return mpu_set_sensors(i2cAddr, sensors);
 }
 
 bool MPU9250_DMP::dataReady()
 {
 	unsigned char intStatusReg;
 	
-	if (mpu_read_reg(MPU9250_INT_STATUS, &intStatusReg) == INV_SUCCESS)
+	if (mpu_read_reg(i2cAddr, MPU9250_INT_STATUS, &intStatusReg) == INV_SUCCESS)
 	{
 		return (intStatusReg & (1<<INT_STATUS_RAW_DATA_RDY_INT));
 	}
@@ -313,7 +321,7 @@ int MPU9250_DMP::updateAccel(void)
 {
 	short data[3];
 	
-	if (mpu_get_accel_reg(data, &time))
+	if (mpu_get_accel_reg(i2cAddr, data, &time))
 	{
 		return INV_ERROR;		
 	}
@@ -327,7 +335,7 @@ int MPU9250_DMP::updateGyro(void)
 {
 	short data[3];
 	
-	if (mpu_get_gyro_reg(data, &time))
+	if (mpu_get_gyro_reg(i2cAddr, data, &time))
 	{
 		return INV_ERROR;		
 	}
@@ -341,7 +349,7 @@ int MPU9250_DMP::updateCompass(void)
 {
 	short data[3];
 	
-	if (mpu_get_compass_reg(data, &time))
+	if (mpu_get_compass_reg(i2cAddr, data, &time))
 	{
 		return INV_ERROR;		
 	}
@@ -353,13 +361,13 @@ int MPU9250_DMP::updateCompass(void)
 
 inv_error_t MPU9250_DMP::updateTemperature(void)
 {
-	return mpu_get_temperature(&temperature, &time);
+	return mpu_get_temperature(i2cAddr, &temperature, &time);
 }
 
 int MPU9250_DMP::selfTest(unsigned char debug)
 {
 	long gyro[3], accel[3];
-	return mpu_run_self_test(gyro, accel);
+	return mpu_run_self_test(i2cAddr, gyro, accel);
 }
 
 inv_error_t MPU9250_DMP::dmpBegin(unsigned short features, unsigned short fifoRate)
@@ -375,13 +383,13 @@ inv_error_t MPU9250_DMP::dmpBegin(unsigned short features, unsigned short fifoRa
 	if (feat & DMP_FEATURE_LP_QUAT)
 	{
 		feat &= ~(DMP_FEATURE_6X_LP_QUAT);
-		dmp_enable_lp_quat(1);
+		dmp_enable_lp_quat(i2cAddr, 1);
 	}
 	else if (feat & DMP_FEATURE_6X_LP_QUAT)
-		dmp_enable_6x_lp_quat(1);
+		dmp_enable_6x_lp_quat(i2cAddr, 1);
 	
 	if (feat & DMP_FEATURE_GYRO_CAL)
-		dmp_enable_gyro_cal(1);
+		dmp_enable_gyro_cal(i2cAddr, 1);
 	
 	if (dmpEnableFeatures(feat) != INV_SUCCESS)
 		return INV_ERROR;
@@ -390,12 +398,12 @@ inv_error_t MPU9250_DMP::dmpBegin(unsigned short features, unsigned short fifoRa
 	if (dmpSetFifoRate(rate) != INV_SUCCESS)
 		return INV_ERROR;
 	
-	return mpu_set_dmp_state(1);
+	return mpu_set_dmp_state(i2cAddr, 1);
 }
 
 inv_error_t MPU9250_DMP::dmpLoad(void)
 {
-	return dmp_load_motion_driver_firmware();
+	return dmp_load_motion_driver_firmware(i2cAddr);
 }
 
 unsigned short MPU9250_DMP::dmpGetFifoRate(void)
@@ -410,7 +418,7 @@ unsigned short MPU9250_DMP::dmpGetFifoRate(void)
 inv_error_t MPU9250_DMP::dmpSetFifoRate(unsigned short rate)
 {
 	if (rate > MAX_DMP_SAMPLE_RATE) rate = MAX_DMP_SAMPLE_RATE;
-	return dmp_set_fifo_rate(rate);
+	return dmp_set_fifo_rate(i2cAddr, rate);
 }
 
 inv_error_t MPU9250_DMP::dmpUpdateFifo(void)
@@ -422,7 +430,7 @@ inv_error_t MPU9250_DMP::dmpUpdateFifo(void)
 	short sensors;
 	unsigned char more;
 	
-	if (dmp_read_fifo(gyro, accel, quat, &timestamp, &sensors, &more)
+	if (dmp_read_fifo(i2cAddr, gyro, accel, quat, &timestamp, &sensors, &more)
 		   != INV_SUCCESS)
     {
 	   return INV_ERROR;
@@ -460,7 +468,7 @@ inv_error_t MPU9250_DMP::dmpEnableFeatures(unsigned short mask)
 	// Combat known issue where fifo sample rate is incorrect
 	// unless tap is enabled in the DMP.
 	enMask |= DMP_FEATURE_TAP; 
-	return dmp_enable_feature(enMask);
+	return dmp_enable_feature(i2cAddr, enMask);
 }
 
 unsigned short MPU9250_DMP::dmpGetEnabledFeatures(void)
@@ -480,30 +488,30 @@ inv_error_t MPU9250_DMP::dmpSetTap(
 	{
 		axes |= TAP_X;
 		xThresh = constrain(xThresh, 1, 1600);
-		if (dmp_set_tap_thresh(1<<X_AXIS, xThresh) != INV_SUCCESS)
+		if (dmp_set_tap_thresh(i2cAddr, 1<<X_AXIS, xThresh) != INV_SUCCESS)
 			return INV_ERROR;
 	}
 	if (yThresh > 0)
 	{
 		axes |= TAP_Y;
 		yThresh = constrain(yThresh, 1, 1600);
-		if (dmp_set_tap_thresh(1<<Y_AXIS, yThresh) != INV_SUCCESS)
+		if (dmp_set_tap_thresh(i2cAddr, 1<<Y_AXIS, yThresh) != INV_SUCCESS)
 			return INV_ERROR;
 	}
 	if (zThresh > 0)
 	{
 		axes |= TAP_Z;
 		zThresh = constrain(zThresh, 1, 1600);
-		if (dmp_set_tap_thresh(1<<Z_AXIS, zThresh) != INV_SUCCESS)
+		if (dmp_set_tap_thresh(i2cAddr, 1<<Z_AXIS, zThresh) != INV_SUCCESS)
 			return INV_ERROR;
 	}
-	if (dmp_set_tap_axes(axes) != INV_SUCCESS)
+	if (dmp_set_tap_axes(i2cAddr, axes) != INV_SUCCESS)
 		return INV_ERROR;
-	if (dmp_set_tap_count(taps) != INV_SUCCESS)
+	if (dmp_set_tap_count(i2cAddr, taps) != INV_SUCCESS)
 		return INV_ERROR;
-	if (dmp_set_tap_time(tapTime) != INV_SUCCESS)
+	if (dmp_set_tap_time(i2cAddr, tapTime) != INV_SUCCESS)
 		return INV_ERROR;
-	if (dmp_set_tap_time_multi(tapMulti) != INV_SUCCESS)
+	if (dmp_set_tap_time_multi(i2cAddr, tapMulti) != INV_SUCCESS)
 		return INV_ERROR;
 	
     dmp_register_tap_cb(tap_cb);
@@ -537,7 +545,7 @@ inv_error_t MPU9250_DMP::dmpSetOrientation(const signed char * orientationMatrix
 	
     dmp_register_android_orient_cb(orient_cb);
 	
-	return dmp_set_orientation(scalar);
+	return dmp_set_orientation(i2cAddr, scalar);
 }
 
 unsigned char MPU9250_DMP::dmpGetOrientation(void)
@@ -557,13 +565,13 @@ inv_error_t MPU9250_DMP::dmpEnable3Quat(void)
 	if (dmpEnableFeatures(dmpFeatures) != INV_SUCCESS)
 		return INV_ERROR;
 	
-	return dmp_enable_lp_quat(1);
+	return dmp_enable_lp_quat(i2cAddr, 1);
 }
 	
 unsigned long MPU9250_DMP::dmpGetPedometerSteps(void)
 {
 	unsigned long steps;
-	if (dmp_get_pedometer_step_count(&steps) == INV_SUCCESS)
+	if (dmp_get_pedometer_step_count(i2cAddr, &steps) == INV_SUCCESS)
 	{
 		return steps;
 	}
@@ -572,13 +580,13 @@ unsigned long MPU9250_DMP::dmpGetPedometerSteps(void)
 
 inv_error_t MPU9250_DMP::dmpSetPedometerSteps(unsigned long steps)
 {
-	return dmp_set_pedometer_step_count(steps);
+	return dmp_set_pedometer_step_count(i2cAddr, steps);
 }
 
 unsigned long MPU9250_DMP::dmpGetPedometerTime(void)
 {
 	unsigned long walkTime;
-	if (dmp_get_pedometer_walk_time(&walkTime) == INV_SUCCESS)
+	if (dmp_get_pedometer_walk_time(i2cAddr, &walkTime) == INV_SUCCESS)
 	{
 		return walkTime;
 	}
@@ -587,7 +595,7 @@ unsigned long MPU9250_DMP::dmpGetPedometerTime(void)
 
 inv_error_t MPU9250_DMP::dmpSetPedometerTime(unsigned long time)
 {
-	return dmp_set_pedometer_walk_time(time);
+	return dmp_set_pedometer_walk_time(i2cAddr, time);
 }
 
 float MPU9250_DMP::calcAccel(int axis)

@@ -16,7 +16,7 @@ Supported Platforms:
 - ATSAMD21 (Arduino Zero, SparkFun SAMD21 Breakouts)
 ******************************************************************************/
 #include "arduino_mpu9250_i2c.h"
-#include <Arduino.h>
+#include <arduino.h>
 #include <Wire.h>
 
 int arduino_i2c_write(unsigned char slave_addr, unsigned char reg_addr,
