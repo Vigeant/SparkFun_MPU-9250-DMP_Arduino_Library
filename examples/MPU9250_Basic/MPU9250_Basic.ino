@@ -19,7 +19,7 @@ Supported Platforms:
 
 #define SerialPort SerialUSB
 
-MPU9250_DMP imu;
+MPU9250_DMP imu(0x69);
 
 void setup() 
 {

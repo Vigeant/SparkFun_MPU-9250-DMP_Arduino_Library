@@ -91,6 +91,7 @@ public:
 	// LPF: 42 Hz
 	// FIFO: 50 Hz, disabled
 	// Output: INV_SUCCESS (0) on success, otherwise error
+	inv_error_t begin(uint32_t i2cFrequency);
 	inv_error_t begin(void);
 	
 	// setSensors(unsigned char) -- Turn on or off MPU-9250 sensors. Any of the 
