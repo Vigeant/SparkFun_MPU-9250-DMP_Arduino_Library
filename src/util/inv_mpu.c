@@ -1048,6 +1048,19 @@ int mpu_set_accel_bias_6500_reg(unsigned char addr, const long *accel_bias) {
     return 0;
 }
 
+/**
+ *  @brief  Reset FIFO read/write pointers.
+ *  @return 0 if successful.
+ */
+int mpu_reset_fifo_fast(unsigned char addr)
+{
+    unsigned char data;
+	data = BIT_FIFO_RST | BIT_DMP_RST;
+    if (i2c_write(addr, st.reg->user_ctrl, 1, &data))
+        return -1;
+	return 0;
+	
+}
 
 /**
  *  @brief  Reset FIFO read/write pointers.
@@ -1688,15 +1701,19 @@ int mpu_read_fifo(unsigned char addr, short *gyro, short *accel, unsigned long *
     if (i2c_read(addr, st.reg->fifo_count_h, 2, data))
         return -1;
     fifo_count = (data[0] << 8) | data[1];
-    if (fifo_count < packet_size)
-        return 0;
+    if (fifo_count < packet_size){
+        //return 0;
+		return -5;
+		//log_i("FIFO count: %hd\n", fifo_count);
+	}
 //    log_i("FIFO count: %hd\n", fifo_count);
     if (fifo_count > (st.hw->max_fifo >> 1)) {
         /* FIFO is 50% full, better check overflow bit. */
         if (i2c_read(addr, st.reg->int_status, 1, data))
             return -1;
         if (data[0] & BIT_FIFO_OVERFLOW) {
-            mpu_reset_fifo(addr);
+            //mpu_reset_fifo(addr);
+			mpu_reset_fifo_fast(addr);
             return -2;
         }
     }
@@ -1748,27 +1765,27 @@ int mpu_read_fifo_stream(unsigned char addr, unsigned short length, unsigned cha
     if (!st.chip_cfg.dmp_on)
         return -1;
     if (!st.chip_cfg.sensors)
-        return -1;
+        return -2;
 
     if (i2c_read(addr, st.reg->fifo_count_h, 2, tmp))
-        return -1;
+        return -3;
     fifo_count = (tmp[0] << 8) | tmp[1];
     if (fifo_count < length) {
         more[0] = 0;
-        return -1;
+        return -4;
     }
     if (fifo_count > (st.hw->max_fifo >> 1)) {
         /* FIFO is 50% full, better check overflow bit. */
         if (i2c_read(addr, st.reg->int_status, 1, tmp))
-            return -1;
+            return -5;
         if (tmp[0] & BIT_FIFO_OVERFLOW) {
             mpu_reset_fifo(addr);
-            return -2;
+            return -6;
         }
     }
 
     if (i2c_read(addr, st.reg->fifo_r_w, length, data))
-        return -1;
+        return -7;
     more[0] = fifo_count / length - 1;
     return 0;
 }

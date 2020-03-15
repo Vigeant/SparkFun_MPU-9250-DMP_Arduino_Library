@@ -265,9 +265,11 @@ inv_error_t MPU9250_DMP::updateFifo(void)
 	short gyro[3], accel[3];
 	unsigned long timestamp;
 	unsigned char sensors, more;
+	inv_error_t err;
 	
-	if (mpu_read_fifo(i2cAddr, gyro, accel, &timestamp, &sensors, &more) != INV_SUCCESS)
-		return INV_ERROR;
+	if ((err = mpu_read_fifo(i2cAddr, gyro, accel, &timestamp, &sensors, &more)) != INV_SUCCESS)
+		return err; //i added to try and debug
+		//return INV_ERROR;
 	
 	if (sensors & INV_XYZ_ACCEL)
 	{
@@ -434,11 +436,20 @@ inv_error_t MPU9250_DMP::dmpUpdateFifo(void)
 	unsigned long timestamp;
 	short sensors;
 	unsigned char more;
+	inv_error_t err;
+	int starttime, dtime;
 	
-	if (dmp_read_fifo(i2cAddr, gyro, accel, quat, &timestamp, &sensors, &more)
-		   != INV_SUCCESS)
+	starttime = millis();
+	err = dmp_read_fifo(i2cAddr, gyro, accel, quat, &timestamp, &sensors, &more);
+	dtime = millis() - starttime;
+	
+	if (err != INV_SUCCESS)
     {
-	   return INV_ERROR;
+		Serial.print("time taken for read: ");
+		Serial.print(dtime);
+		Serial.print(" ms\n");
+		return err;
+		//return INV_ERROR;
     }
 	
 	if (sensors & INV_XYZ_ACCEL)
@@ -663,6 +674,38 @@ void MPU9250_DMP::computeEulerAngles(bool degrees)
 		if (pitch < 0) pitch = 360.0 + pitch;
 		if (roll < 0) roll = 360.0 + roll;
 		if (yaw < 0) yaw = 360.0 + yaw;	
+	}
+}
+
+void MPU9250_DMP::computeEulerAngles2(bool degrees)
+{
+    float q0 = qToFloat(qw, 30);
+    float q1 = qToFloat(qx, 30);
+    float q2 = qToFloat(qy, 30);
+    float q3 = qToFloat(qz, 30);
+	
+	float q02 = q0 * q0;
+	float q12 = q1 * q1;
+	float q22 = q2 * q2;
+	float q32 = q3 * q3;
+  
+	// Keep t2 within range of asin (-1, 1)
+    //t2 = t2 > 1.0f ? 1.0f : t2;
+    //t2 = t2 < -1.0f ? -1.0f : t2;
+  
+	yaw = atan2(+2.0f * (q1 * q2 + q0 * q3), q02 + q12 - q22 - q32);
+	pitch = atan2(+2.0f * (q0 * q1 + q2 * q3), q02 - q12 - q22 + q32);
+    roll = -asin(+2.0f * (q1 * q3 - q0 * q2));
+	
+	if (degrees)
+	{
+		yaw = yaw * 180.0 / PI;
+		pitch = pitch * 180.0 / PI;
+		roll = roll * 180.0 / PI;
+		
+		//if (pitch < 0) pitch = 360.0 + pitch;
+		//if (roll < 0) roll = 360.0 + roll;
+		//if (yaw < 0) yaw = 360.0 + yaw;	
 	}
 }
 

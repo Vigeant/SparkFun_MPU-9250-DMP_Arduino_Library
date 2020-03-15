@@ -26,6 +26,7 @@ Supported Platforms:
 #define MPU9250
 #define AK8963_SECONDARY
 #define COMPASS_ENABLED
+//#define FIFO_CORRUPTION_CHECK
 
 // Include the Invensense MPU9250 driver and DMP keys:
 extern "C" {
@@ -366,6 +367,8 @@ public:
 	// Input: boolean indicating whether angle results are presented in degrees or radians
 	// Output: class variables roll, pitch, and yaw will be updated on exit.	
 	void computeEulerAngles(bool degrees = true);
+	
+	void computeEulerAngles2(bool degrees = true);
 	
 	// computeCompassHeading -- Compute heading based on most recently read mx, my, and mz values
 	// Output: class variable heading will be updated on exit
